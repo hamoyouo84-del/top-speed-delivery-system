@@ -1,123 +1,59 @@
-// 1. تعريف قاعدة البيانات محلياً داخل الملف لضمان الاستقرار
+// 1. إدارة البيانات (Local Storage)
 const TopSpeedDB = {
     save: (key, data) => localStorage.setItem('ts_' + key, JSON.stringify(data)),
-    load: (key) => {
-        try {
-            return JSON.parse(localStorage.getItem('ts_' + key)) || [];
-        } catch(e) { return []; }
-    },
+    load: (key) => JSON.parse(localStorage.getItem('ts_' + key)) || [],
     clear: () => {
-        if(confirm("تصفير جميع البيانات؟")) {
+        if(confirm("هل تريد تصفير جميع بيانات النظام؟")) {
             localStorage.clear();
             location.reload();
         }
     }
 };
 
-// 2. تحميل البيانات
+// 2. تحميل البيانات الأولية
 let drivers = TopSpeedDB.load('drivers');
 let orders = TopSpeedDB.load('orders');
 
-// 3. التحكم في شاشة التحميل (Loader)
-let count = 0;
-const updateLoader = () => {
-    const counter = document.getElementById('counter');
-    const loader = document.getElementById('loaderWrapper');
-    const main = document.getElementById('mainSystem');
-
-    if (count < 100) {
-        count += 10;
-        if(counter) counter.innerText = count + "%";
-        setTimeout(updateLoader, 30);
-    } else {
-        if(loader) loader.style.display = 'none';
-        if(main) {
-            main.style.display = 'flex';
-            main.style.opacity = '1';
+// 3. تشغيل شاشة التحميل (Loader)
+window.onload = () => {
+    let count = 0;
+    const interval = setInterval(() => {
+        count += 5;
+        document.getElementById('counter').innerText = count + "%";
+        if (count >= 100) {
+            clearInterval(interval);
+            document.getElementById('loaderWrapper').style.display = 'none';
+            document.getElementById('mainSystem').style.display = 'flex';
+            document.body.classList.remove('overflow-hidden');
+            renderAll(); // عرض البيانات فوراً
         }
-        document.body.classList.remove('overflow-hidden');
-        renderAll(); // عرض البيانات فوراً
-    }
+    }, 30);
 };
 
-// 4. دالة عرض البيانات (التي كانت تسبب المشكلة)
-function renderAll() {
-    // أ- تحديث جدول الطلبات
-    const tableBody = document.getElementById('ordersTableBody');
-    if (tableBody) {
-        if (orders.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold">لا توجد طلبات اليوم</td></tr>';
-        } else {
-            tableBody.innerHTML = orders.map((o, index) => {
-                const isDone = o.status === 'تم التسليم';
-                return `
-                    <tr class="border-b bg-white hover:bg-slate-50 transition">
-                        <td class="p-4 font-bold text-slate-800">${o.rest || 'بدون اسم'}</td>
-                        <td class="p-4 text-xs">
-                            <a href="https://www.google.com/maps/search/${encodeURIComponent(o.addr)}" target="_blank" class="text-blue-500 hover:underline">
-                                <i class="fas fa-map-marker-alt ml-1"></i> ${o.addr || 'غير محدد'}
-                            </a>
-                        </td>
-                        <td class="p-4 font-black text-slate-900">${o.price} EGP</td>
-                        <td class="p-4 text-sm font-bold text-slate-600">${o.driverName || 'غير محدد'}</td>
-                        <td class="p-4 text-center">
-                            ${isDone 
-                                ? `<span class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black border border-green-200">تم التسليم ✅</span>`
-                                : `<button onclick="completeOrder(${o.id})" class="bg-blue-600 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm active:scale-95">تأكيد التسليم</button>`
-                            }
-                        </td>
-                    </tr>
-                `;
-            }).reverse().join('');
-        }
-    }
-
-    // ب- تحديث قائمة المناديب (Dropdown)
-    const select = document.getElementById('driverSelect');
-    if (select) {
-        select.innerHTML = '<option value="" disabled selected>اختيار المندوب</option>' + 
-            drivers.map(d => `<option value="${d.code}">${d.name}</option>`).join('');
-    }
-
-    // ج- تحديث شبكة المناديب (Drivers Grid)
-    const grid = document.getElementById('driversGrid');
-    if (grid) {
-        grid.innerHTML = drivers.length ? drivers.map(d => `
-            <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
-                <span class="font-bold text-slate-700">${d.name} <small class="text-slate-400 block text-[10px]">كود: ${d.code}</small></span>
-                <i class="fas fa-user-check text-blue-500"></i>
-            </div>
-        `).join('') : '<p class="text-center text-slate-400 col-span-2">لم يتم إضافة مناديب بعد</p>';
-    }
-
-    // د- تحديث الرصيد (يحسب فقط الطلبات المكتملة)
-    const total = orders
-        .filter(o => o.status === 'تم التسليم')
-        .reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
-    
-    const incomeEl = document.getElementById('dailyIncome');
-    if (incomeEl) incomeEl.innerText = total.toLocaleString();
-}
-
-// 5. إدارة المناديب والطلبات
+// 4. دالة إضافة مندوب
 function addNewDriver() {
-    const name = document.getElementById('newDriverName').value;
-    const code = document.getElementById('newDriverCode').value;
-    if(!name || !code) return alert("أدخل بيانات المندوب كاملة");
+    const name = document.getElementById('newDriverName').value.trim();
+    const code = document.getElementById('newDriverCode').value.trim();
+
+    if(!name || !code) return alert("برجاء إدخال اسم المندوب وكوده");
+
     drivers.push({ name, code });
     TopSpeedDB.save('drivers', drivers);
-    renderAll();
+    
     document.getElementById('newDriverName').value = '';
     document.getElementById('newDriverCode').value = '';
+    renderAll();
+    alert("تم تفعيل المندوب بنجاح");
 }
 
+// 5. دالة إضافة أوردر
 function addNewOrder() {
-    const rest = document.getElementById('restName').value;
-    const addr = document.getElementById('orderAddress').value;
-    const price = document.getElementById('orderPrice').value;
+    const rest = document.getElementById('restName').value.trim();
+    const addr = document.getElementById('orderAddress').value.trim();
+    const price = document.getElementById('orderPrice').value.trim();
     const dSelect = document.getElementById('driverSelect');
 
-    if(!rest || !addr || !price || !dSelect.value) return alert("أكمل بيانات الطلب");
+    if(!rest || !addr || !price || !dSelect.value) return alert("أكمل بيانات الأوردر واختار المندوب");
 
     const newOrder = {
         id: Date.now(),
@@ -130,26 +66,67 @@ function addNewOrder() {
 
     orders.push(newOrder);
     TopSpeedDB.save('orders', orders);
-    renderAll();
     
     document.getElementById('restName').value = '';
     document.getElementById('orderAddress').value = '';
     document.getElementById('orderPrice').value = '';
+    renderAll();
 }
 
+// 6. دالة تأكيد التسليم (تغيير الحالة وحساب المبلغ)
 function completeOrder(orderId) {
     const index = orders.findIndex(o => o.id === orderId);
-    if (index !== -1) {
+    if(index !== -1) {
         orders[index].status = 'تم التسليم';
         TopSpeedDB.save('orders', orders);
         renderAll();
     }
 }
 
-function showSection(section) {
-    document.getElementById('ordersSection').classList.toggle('hidden', section !== 'orders');
-    document.getElementById('driversSection').classList.toggle('hidden', section !== 'drivers');
+// 7. تحديث الواجهة (الرسم الفعلي للجدول)
+function renderAll() {
+    // تحديث الجدول
+    const tableBody = document.getElementById('ordersTableBody');
+    tableBody.innerHTML = orders.map(o => `
+        <tr class="border-b bg-white transition hover:bg-slate-50">
+            <td class="p-4 font-bold text-slate-800">${o.rest}</td>
+            <td class="p-4 text-xs text-blue-600 underline">
+                <a href="https://www.google.com/maps/search/${encodeURIComponent(o.addr)}" target="_blank">${o.addr}</a>
+            </td>
+            <td class="p-4 font-black text-slate-900">${o.price} EGP</td>
+            <td class="p-4 text-sm font-bold text-slate-600">${o.driverName}</td>
+            <td class="p-4 text-center">
+                ${o.status === 'تم التسليم' 
+                    ? `<span class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black border border-green-200">تم التسليم ✅</span>`
+                    : `<button onclick="completeOrder(${o.id})" class="bg-blue-600 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm">تأكيد التسليم</button>`
+                }
+            </td>
+        </tr>
+    `).reverse().join('');
+
+    // تحديث قائمة المناديب (Dropdown)
+    const select = document.getElementById('driverSelect');
+    select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>' + 
+        drivers.map(d => `<option value="${d.code}">${d.name}</option>`).join('');
+
+    // تحديث شبكة المناديب (Grid)
+    const grid = document.getElementById('driversGrid');
+    grid.innerHTML = drivers.map(d => `
+        <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
+            <span class="font-bold text-slate-700">${d.name} <small class="text-slate-400 block text-[10px]">Code: ${d.code}</small></span>
+            <i class="fas fa-check-circle text-green-500"></i>
+        </div>
+    `).join('');
+
+    // تحديث إجمالي الرصيد (الطلبات المسلمة فقط)
+    const total = orders
+        .filter(o => o.status === 'تم التسليم')
+        .reduce((sum, o) => sum + o.price, 0);
+    document.getElementById('dailyIncome').innerText = total.toLocaleString();
 }
 
-// 6. بدء التشغيل
-document.addEventListener('DOMContentLoaded', updateLoader);
+// التنقل بين الصفحات
+function showSection(id) {
+    document.getElementById('ordersSection').classList.toggle('hidden', id !== 'orders');
+    document.getElementById('driversSection').classList.toggle('hidden', id !== 'drivers');
+}
