@@ -1,179 +1,144 @@
-// --- 1. إعدادات قاعدة البيانات المحلية (Local Storage) ---
-// وضعناها هنا مباشرة لضمان أن الزر يجدها دائماً
-const DB = {
+// 1. نظام قاعدة البيانات المصغر
+const TopSpeedDB = {
     save: (key, data) => localStorage.setItem('ts_' + key, JSON.stringify(data)),
-    load: (key) => {
-        const data = localStorage.getItem('ts_' + key);
-        return data ? JSON.parse(data) : [];
+    load: (key) => JSON.parse(localStorage.getItem('ts_' + key)) || [],
+    clear: () => {
+        if(confirm("هل أنت متأكد من مسح جميع البيانات؟")) {
+            localStorage.clear();
+            location.reload();
+        }
     }
 };
 
-// --- 2. متغيرات النظام ---
-let drivers = DB.load('drivers');
-let orders = DB.load('orders');
-let totalIncome = parseFloat(localStorage.getItem('ts_total')) || 0;
+// 2. المتغيرات الأساسية
+let drivers = TopSpeedDB.load('drivers');
+let orders = TopSpeedDB.load('orders');
 
-// --- 3. نظام التحميل (Loader) ---
+// 3. وظيفة شاشة التحميل
 let count = 0;
-function updateLoader() {
-    const counter = document.getElementById('counter');
-    const loader = document.getElementById('loaderWrapper');
-    const main = document.getElementById('mainSystem');
+const counter = document.getElementById('counter');
+const loader = document.getElementById('loaderWrapper');
+const main = document.getElementById('mainSystem');
 
+function updateLoader() {
     if (count < 100) {
         count += 5;
-        if(counter) counter.innerText = count + "%";
-        setTimeout(updateLoader, 30);
+        counter.innerText = count + "%";
+        setTimeout(updateLoader, 20);
     } else {
-        if(loader) loader.style.display = 'none';
-        if(main) main.style.display = 'flex';
-        document.body.classList.remove('overflow-hidden');
+        loader.style.display = 'none';
+        main.style.display = 'flex';
+        renderAll();
     }
 }
+updateLoader();
 
-// --- 4. دالة إضافة مندوب جديد (التي كانت لا تعمل) ---
+// 4. إدارة المناديب
 function addNewDriver() {
-    const nameInput = document.getElementById('newDriverName');
-    const codeInput = document.getElementById('newDriverCode');
-
-    // التأكد من أن العناصر موجودة والقيم ليست فارغة
-    if (!nameInput || !codeInput || !nameInput.value.trim() || !codeInput.value.trim()) {
-        alert("من فضلك ادخل اسم المندوب وكوده!");
-        return;
-    }
-
-    const newDriver = {
-        name: nameInput.value.trim(),
-        code: codeInput.value.trim()
-    };
-
-    // إضافة للذاكرة
-    drivers.push(newDriver);
-    DB.save('drivers', drivers);
-
-    // تحديث الواجهة
-    updateDriverUI();
-    
-    // مسح الخانات وتنبيه النجاح
-    nameInput.value = '';
-    codeInput.value = '';
-    alert("✅ تم تفعيل المندوب بنجاح!");
+    const name = document.getElementById('newDriverName').value;
+    const code = document.getElementById('newDriverCode').value;
+    if(!name || !code) return alert("أدخل بيانات المندوب كاملة");
+    drivers.push({ name, code });
+    TopSpeedDB.save('drivers', drivers);
+    renderAll();
+    document.getElementById('newDriverName').value = '';
+    document.getElementById('newDriverCode').value = '';
 }
 
-// تحديث عرض المناديب في الجدول والقائمة المنسدلة
-function updateDriverUI() {
-    const grid = document.getElementById('driversGrid');
-    const select = document.getElementById('driverSelect');
-    
-    if (grid) grid.innerHTML = '';
-    if (select) select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>';
-
-    drivers.forEach((d, index) => {
-        // إضافة لشبكة المناديب
-        if (grid) {
-            grid.innerHTML += `
-                <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
-                    <div>
-                        <p class="font-bold text-slate-800">${d.name}</p>
-                        <p class="text-xs text-slate-400">كود: ${d.code}</p>
-                    </div>
-                    <button onclick="deleteDriver(${index})" class="text-red-400 hover:text-red-600 p-2">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </div>`;
-        }
-        // إضافة للقائمة المنسدلة في صفحة الطلبات
-        if (select) {
-            const opt = document.createElement('option');
-            opt.value = d.code;
-            opt.innerText = d.name;
-            select.appendChild(opt);
-        }
-    });
-}
-
-function deleteDriver(index) {
-    if (confirm("هل تريد حذف هذا المندوب؟")) {
-        drivers.splice(index, 1);
-        DB.save('drivers', drivers);
-        updateDriverUI();
-    }
-}
-
-// --- 5. نظام الطلبات (Orders) ---
+// 5. إدارة الطلبات
 function addNewOrder() {
-    const rest = document.getElementById('restName');
-    const addr = document.getElementById('orderAddress');
-    const price = document.getElementById('orderPrice');
-    const dSelect = document.getElementById('driverSelect');
+    const rest = document.getElementById('restName').value;
+    const addr = document.getElementById('orderAddress').value;
+    const price = document.getElementById('orderPrice').value;
+    const driverCode = document.getElementById('driverSelect').value;
 
-    if (!rest.value || !addr.value || !price.value || !dSelect.value) {
-        alert("برجاء إكمال بيانات الطلب!");
-        return;
-    }
+    if(!rest || !addr || !price || !driverCode) return alert("أكمل بيانات الطلب");
 
-    const order = {
+    const driver = drivers.find(d => d.code === driverCode);
+    
+    const newOrder = {
         id: Date.now(),
-        rest: rest.value,
-        addr: addr.value,
-        price: parseFloat(price.value),
-        driverCode: dSelect.value,
-        driverName: dSelect.options[dSelect.selectedIndex].text,
-        status: 'معلق'
+        rest,
+        addr,
+        price: parseFloat(price),
+        driverName: driver.name,
+        status: 'معلق' // الحالة الافتراضية
     };
 
-    orders.push(order);
-    DB.save('orders', orders);
-
-    totalIncome += order.price;
-    localStorage.setItem('ts_total', totalIncome);
+    orders.push(newOrder);
+    TopSpeedDB.save('orders', orders);
+    renderAll();
     
-    renderOrders();
-    updateIncomeUI();
-
-    // تصفير الخانات
-    rest.value = ''; addr.value = ''; price.value = '';
+    document.getElementById('restName').value = '';
+    document.getElementById('orderAddress').value = '';
+    document.getElementById('orderPrice').value = '';
 }
 
-function renderOrders() {
-    const body = document.getElementById('ordersTableBody');
-    if (!body) return;
-    body.innerHTML = '';
+// 6. دالة تغيير الحالة وحساب الرصيد (الميزة الجديدة)
+function completeOrder(orderId) {
+    const index = orders.findIndex(o => o.id === orderId);
+    if (index !== -1) {
+        orders[index].status = 'تم التسليم';
+        TopSpeedDB.save('orders', orders);
+        renderAll(); // سيقوم بتحديث الرصيد تلقائياً
+    }
+}
 
-    orders.forEach(o => {
-        const mapUrl = `https://www.google.com/maps/search/${encodeURIComponent(o.addr)}`;
-        body.innerHTML += `
-            <tr class="border-b hover:bg-slate-50 transition text-sm">
-                <td class="p-4 font-bold">${o.rest}</td>
-                <td class="p-4">
-                    <a href="${mapUrl}" target="_blank" class="text-blue-500 underline">
-                        <i class="fas fa-map-marker-alt"></i> ${o.addr}
+// 7. التحديث الشامل للواجهة
+function renderAll() {
+    // تحديث جدول الطلبات
+    const tableBody = document.getElementById('ordersTableBody');
+    tableBody.innerHTML = orders.map(o => {
+        const isDone = o.status === 'تم التسليم';
+        return `
+            <tr class="border-b transition hover:bg-slate-50">
+                <td class="p-4 font-bold text-slate-700">${o.rest}</td>
+                <td class="p-4 text-xs">
+                    <a href="https://www.google.com/maps/search/${encodeURIComponent(o.addr)}" target="_blank" class="text-blue-500 hover:underline">
+                        <i class="fas fa-map-marker-alt ml-1"></i> ${o.addr}
                     </a>
                 </td>
-                <td class="p-4 font-bold text-blue-600">${o.price} EGP</td>
-                <td class="p-4 font-bold">${o.driverName}</td>
+                <td class="p-4 font-black text-slate-900">${o.price} EGP</td>
+                <td class="p-4 text-sm font-bold text-slate-600">${o.driverName}</td>
                 <td class="p-4 text-center">
-                    <span class="px-3 py-1 rounded-lg text-[10px] font-black status-pending">${o.status}</span>
+                    ${isDone 
+                        ? `<span class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black border border-green-200">
+                             تم التسليم <i class="fas fa-check-circle mr-1"></i>
+                           </span>`
+                        : `<button onclick="completeOrder(${o.id})" class="bg-blue-600 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition-all shadow-sm active:scale-95">
+                             تأكيد التسليم
+                           </button>`
+                    }
                 </td>
-            </tr>`;
-    });
+            </tr>
+        `;
+    }).join('');
+
+    // تحديث قائمة اختيار المندوب
+    const select = document.getElementById('driverSelect');
+    select.innerHTML = '<option value="" disabled selected>اختيار المندوب</option>' + 
+        drivers.map(d => `<option value="${d.code}">${d.name}</option>`).join('');
+
+    // تحديث قائمة المناديب
+    const grid = document.getElementById('driversGrid');
+    grid.innerHTML = drivers.map(d => `
+        <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
+            <span class="font-bold text-slate-700">${d.name} <small class="text-slate-400 block text-[10px]">كود: ${d.code}</small></span>
+            <i class="fas fa-user-check text-blue-500"></i>
+        </div>
+    `).join('');
+
+    // تحديث إجمالي المحصل (يحسب فقط الطلبات التي حالتها "تم التسليم")
+    const total = orders
+        .filter(o => o.status === 'تم التسليم')
+        .reduce((sum, o) => sum + o.price, 0);
+    
+    document.getElementById('dailyIncome').innerText = total.toLocaleString();
 }
 
-function updateIncomeUI() {
-    const el = document.getElementById('dailyIncome');
-    if (el) el.innerText = totalIncome.toLocaleString();
+// التنقل بين الأقسام
+function showSection(section) {
+    document.getElementById('ordersSection').classList.toggle('hidden', section !== 'orders');
+    document.getElementById('driversSection').classList.toggle('hidden', section !== 'drivers');
 }
 
-// --- 6. التنقل وتشغيل النظام ---
-function showSection(id) {
-    document.getElementById('ordersSection').classList.add('hidden');
-    document.getElementById('driversSection').classList.add('hidden');
-    document.getElementById(id + 'Section').classList.remove('hidden');
-}
-
-window.onload = () => {
-    updateLoader();
-    updateDriverUI();
-    renderOrders();
-    updateIncomeUI();
-};
