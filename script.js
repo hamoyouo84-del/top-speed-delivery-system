@@ -141,4 +141,3 @@ function showSection(section) {
     document.getElementById('ordersSection').classList.toggle('hidden', section !== 'orders');
     document.getElementById('driversSection').classList.toggle('hidden', section !== 'drivers');
 }
-
