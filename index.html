@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Top Speed | نظام إدارة التوصيل</title>
+    <title>Top Speed | لوحة التحكم</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
@@ -18,11 +18,12 @@
     <style>
         body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; margin: 0; }
         #mainSystem { display: none; }
-        /* تحسين مظهر الجدول في الشاشات الصغيرة */
         @media (max-width: 768px) {
             .table-container { overflow-x: auto; }
-            aside { display: none; } /* إخفاء القائمة الجانبية في الموبايل */
+            aside { display: none; }
         }
+        .status-done { background-color: #dcfce7; color: #166534; font-weight: 900; }
+        .status-pending { background-color: #fef9c3; color: #854d0e; font-weight: 900; }
     </style>
 </head>
 <body class="overflow-hidden">
@@ -35,7 +36,7 @@
                 <div class="circle-border ring-2"></div>
                 <div class="circle-border ring-3"></div>
                 <div class="percentage" id="counter">0%</div>
-                <div class="status-text" id="status">System Booting...</div>
+                <div class="status-text" id="status">Top Speed System...</div>
             </div>
         </div>
     </div>
@@ -43,68 +44,69 @@
     <div id="mainSystem" class="h-screen flex flex-col md:flex-row">
         <aside class="w-64 bg-[#0f172a] text-white flex flex-col hidden md:flex shadow-2xl">
             <div class="p-6 text-2xl font-black border-b border-slate-800 flex flex-col gap-1">
-                <span class="text-yellow-500 italic leading-none">TOP SPEED</span>
-                <span class="text-[10px] text-slate-500 tracking-[0.2em] font-bold uppercase">Delivery System</span>
+                <span class="text-yellow-500 italic leading-none uppercase">Top Speed</span>
+                <span class="text-[10px] text-slate-500 tracking-[0.2em] font-bold uppercase">Admin Panel</span>
             </div>
             <nav class="flex-1 p-4 space-y-3">
                 <button onclick="showSection('orders')" class="w-full flex items-center p-3 bg-blue-600 rounded-xl transition shadow-lg font-bold">
                     <i class="fas fa-layer-group ml-3 text-blue-200"></i> لوحة الطلبات
                 </button>
                 <button onclick="showSection('drivers')" class="w-full flex items-center p-3 hover:bg-slate-800 rounded-xl transition text-slate-300 font-bold">
-                    <i class="fas fa-id-card ml-3 text-slate-500"></i> إضافة مناديب
+                    <i class="fas fa-id-card ml-3 text-slate-500"></i> إدارة المناديب
                 </button>
                 <button onclick="TopSpeedDB.clear()" class="w-full flex items-center p-3 hover:bg-red-900/30 text-red-400 rounded-xl transition font-bold mt-auto">
-                    <i class="fas fa-trash-alt ml-3"></i> تصفير البيانات
+                    <i class="fas fa-trash-alt ml-3"></i> تصفير النظام
                 </button>
             </nav>
         </aside>
 
         <main class="flex-1 flex flex-col overflow-hidden bg-slate-50">
             <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm">
-                <div class="bg-slate-900 text-white px-5 py-2.5 rounded-2xl flex items-center gap-4 shadow-inner">
+                <div class="bg-slate-900 text-white px-5 py-2.5 rounded-2xl flex items-center gap-4">
                     <div class="flex flex-col">
-                        <span class="text-[10px] text-blue-400 font-black uppercase">إجمالي المحصل اليوم</span>
-                        <div class="flex items-center gap-2 text-right" dir="ltr">
+                        <span class="text-[10px] text-blue-400 font-black">إجمالي المحصل اليوم</span>
+                        <div class="flex items-center gap-2" dir="ltr">
                             <span id="dailyIncome" class="text-2xl font-black">0</span>
-                            <span class="text-xs font-bold text-slate-400 font-mono">EGP</span>
+                            <span class="text-xs font-bold text-slate-400">EGP</span>
                         </div>
                     </div>
                 </div>
-                <div class="flex md:hidden gap-2">
-                    <button onclick="showSection('orders')" class="p-2 text-slate-600"><i class="fas fa-list-ul fa-lg"></i></button>
-                    <button onclick="showSection('drivers')" class="p-2 text-slate-600"><i class="fas fa-users fa-lg"></i></button>
-                </div>
-                <div class="text-left hidden sm:block">
-                    <h1 class="text-xl font-black text-slate-800 italic uppercase tracking-tighter">Top speed</h1>
+                <div class="flex md:hidden gap-4">
+                     <button onclick="showSection('orders')"><i class="fas fa-list-check text-slate-600 fa-lg"></i></button>
+                     <button onclick="showSection('drivers')"><i class="fas fa-user-plus text-slate-600 fa-lg"></i></button>
                 </div>
             </header>
 
             <section id="ordersSection" class="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                     <div>
-                        <label class="block text-xs font-black text-slate-500 mb-1 italic">المطعم</label>
-                        <input type="text" id="restName" placeholder="اسم المطعم.." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-black text-slate-500 mb-1">المطعم</label>
+                        <input type="text" id="restName" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-black text-slate-500 mb-1 italic">المبلغ</label>
-                        <input type="number" id="orderPrice" placeholder="0.00" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-black text-slate-500 mb-1">العنوان (مفصل أو لوكيشن)</label>
+                        <input type="text" id="orderAddress" placeholder="المنطقة - الشارع - رقم العقار" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-black text-slate-500 mb-1 italic">المندوب</label>
-                        <select id="driverSelect" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"></select>
+                        <label class="block text-xs font-black text-slate-500 mb-1">المبلغ</label>
+                        <input type="number" id="orderPrice" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <button onclick="addNewOrder()" class="bg-[#0f172a] text-white py-3.5 rounded-xl font-black hover:bg-blue-600 transition shadow-xl">إضافة الأوردر</button>
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 mb-1">المندوب</label>
+                        <select id="driverSelect" class="w-full p-3 bg-slate-50 border rounded-xl outline-none font-bold"></select>
+                    </div>
+                    <button onclick="addNewOrder()" class="bg-[#0f172a] text-white py-3.5 rounded-xl font-black hover:bg-blue-600 transition shadow-xl">تأكيد الأوردر</button>
                 </div>
 
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden table-container">
-                    <table class="w-full text-right min-w-[600px]">
+                    <table class="w-full text-right min-w-[800px]">
                         <thead class="bg-slate-50 text-slate-400 border-b">
                             <tr>
-                                <th class="p-4 text-[10px] font-black italic">المطعم</th>
-                                <th class="p-4 text-[10px] font-black italic">المبلغ</th>
-                                <th class="p-4 text-[10px] font-black italic">المندوب</th>
-                                <th class="p-4 text-[10px] font-black italic">الحالة</th>
-                                <th class="p-4 text-[10px] font-black italic text-center">إجراءات</th>
+                                <th class="p-4 text-[10px] font-black uppercase">المطعم</th>
+                                <th class="p-4 text-[10px] font-black uppercase">العنوان والموقع</th>
+                                <th class="p-4 text-[10px] font-black uppercase">المبلغ</th>
+                                <th class="p-4 text-[10px] font-black uppercase">المندوب</th>
+                                <th class="p-4 text-[10px] font-black uppercase text-center">الحالة</th>
                             </tr>
                         </thead>
                         <tbody id="ordersTableBody"></tbody>
@@ -118,13 +120,13 @@
                     <div class="bg-white p-6 rounded-2xl border-2 border-dashed grid grid-cols-1 md:grid-cols-3 gap-4 items-end text-right">
                         <div>
                             <label class="block text-xs font-bold mb-1 text-slate-500">اسم المندوب</label>
-                            <input type="text" id="newDriverName" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                            <input type="text" id="newDriverName" class="w-full p-3 bg-gray-50 border rounded-xl">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold mb-1 text-slate-500">كود المندوب</label>
-                            <input type="text" id="newDriverCode" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                            <label class="block text-xs font-bold mb-1 text-slate-500">كود المندوب (للدخول)</label>
+                            <input type="text" id="newDriverCode" class="w-full p-3 bg-gray-50 border rounded-xl">
                         </div>
-                        <button onclick="addNewDriver()" class="bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">حفظ المندوب</button>
+                        <button onclick="addNewDriver()" class="bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">إضافة المندوب</button>
                     </div>
                     <div id="driversGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
                 </div>
@@ -138,3 +140,4 @@
     <script src="script.js"></script> 
 </body>
 </html>
+
