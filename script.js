@@ -1,110 +1,130 @@
-// مصفوفة لتخزين الأوردرات
+// --- الجزء الخاص بصفحة التحميل (Hacker Loader) ---
+const counterElement = document.getElementById('counter');
+const statusElement = document.getElementById('status');
+const loaderContainer = document.getElementById('loaderContainer');
+const loaderWrapper = document.getElementById('loaderWrapper');
+const mainSystem = document.getElementById('mainSystem');
+
+let count = 0;
+
+function getRandom(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+function updateLoader() {
+    if (count < 100) {
+        let increment = (Math.random() > 0.8) ? 2 : 1;
+        count = Math.min(count + increment, 100);
+        counterElement.innerText = count + '%';
+
+        if (count === 30) statusElement.innerText = "Verifying...";
+        if (count === 70) statusElement.innerText = "Optimizing...";
+        if (count === 90) statusElement.innerText = "Finalizing...";
+
+        let speed = getRandom(20, 100);
+        if (count > 95) speed = 250;
+        setTimeout(updateLoader, speed);
+    } else {
+        finishLoading();
+    }
+}
+
+function finishLoading() {
+    statusElement.innerText = "ACCESS GRANTED";
+    loaderContainer.classList.add('finished');
+    
+    // إخفاء الـ Loader وإظهار السيستم بعد ثانية واحدة
+    setTimeout(() => {
+        loaderWrapper.style.display = 'none';
+        mainSystem.style.display = 'flex';
+        document.body.classList.remove('overflow-hidden');
+    }, 1200);
+}
+
+// تشغيل الـ Loader عند فتح الصفحة
+setTimeout(updateLoader, 500);
+
+
+// --- الجزء الخاص بنظام Top Speed ---
 let orders = [];
+let drivers = [];
 let dailyTotal = 0;
 
-// إضافة أوردر جديد
+function addNewDriver() {
+    const name = document.getElementById('newDriverName').value.trim();
+    const code = document.getElementById('newDriverCode').value.trim();
+    if(!name || !code) return alert("أدخل بيانات المندوب!");
+    drivers.push({ name, code });
+    updateDriverUI();
+    document.getElementById('newDriverName').value = '';
+    document.getElementById('newDriverCode').value = '';
+}
+
+function updateDriverUI() {
+    const grid = document.getElementById('driversGrid');
+    const select = document.getElementById('driverSelect');
+    grid.innerHTML = '';
+    select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>';
+    drivers.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = `${d.code}|${d.name}`;
+        opt.innerText = `${d.name} (${d.code})`;
+        select.appendChild(opt);
+        grid.innerHTML += `<div class="bg-white p-4 rounded-xl border-b-4 border-blue-600 shadow flex justify-between items-center"><span class="font-black">${d.name}</span><span class="text-xs bg-slate-100 p-1 rounded font-mono">${d.code}</span></div>`;
+    });
+}
+
 function addNewOrder() {
     const rest = document.getElementById('restName').value;
-    const priceInput = document.getElementById('orderPrice').value;
-    const driverData = document.getElementById('driverSelect').value.split('|');
-
-    if(!rest || !priceInput) {
-        alert("برجاء إدخال اسم المطعم والسعر!");
-        return;
-    }
-
-    const newOrder = {
-        id: Date.now(),
-        rest: rest,
-        price: parseFloat(priceInput),
-        driverCode: driverData[0],
-        driverName: driverData[1],
-        status: 'pending' // الحالات: pending, moving, delivered
-    };
-
-    orders.push(newOrder);
+    const price = document.getElementById('orderPrice').value;
+    const driverVal = document.getElementById('driverSelect').value;
+    if(!rest || !price || !driverVal) return alert("أكمل البيانات!");
+    const [dCode, dName] = driverVal.split('|');
+    orders.push({ id: Date.now(), rest, price: parseFloat(price), driverCode: dCode, driverName: dName, status: 'pending' });
     renderOrders();
-    
-    // تصفير الحقول
     document.getElementById('restName').value = '';
     document.getElementById('orderPrice').value = '';
 }
 
-// تحديث حالة الأوردر
 function updateStatus(id, nextStatus) {
-    const orderIndex = orders.findIndex(o => o.id === id);
-    if (orderIndex === -1) return;
-
-    orders[orderIndex].status = nextStatus;
-    
-    // إذا تم التسليم، يضاف السعر لليومية
-    if(nextStatus === 'delivered') {
-        dailyTotal += orders[orderIndex].price;
-        document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString() + " ج.م";
+    const order = orders.find(o => o.id === id);
+    if(nextStatus === 'delivered' && order.status !== 'delivered') {
+        dailyTotal += order.price;
+        document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString();
     }
+    order.status = nextStatus;
     renderOrders();
 }
 
-// حذف أوردر
 function deleteOrder(id) {
-    if(confirm('هل أنت متأكد من حذف هذا الأوردر؟')) {
-        const order = orders.find(o => o.id === id);
-        // إذا كان تم تسليمه، يتم خصمه من اليومية عند الحذف
-        if(order.status === 'delivered') {
-            dailyTotal -= order.price;
-            document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString() + " ج.م";
-        }
-        orders = orders.filter(o => o.id !== id);
-        renderOrders();
-    }
+    const order = orders.find(o => o.id === id);
+    if(order.status === 'delivered') dailyTotal -= order.price;
+    orders = orders.filter(o => o.id !== id);
+    document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString();
+    renderOrders();
 }
 
-// عرض البيانات في الجدول
 function renderOrders() {
     const tbody = document.getElementById('ordersTableBody');
     tbody.innerHTML = '';
-
     orders.forEach(order => {
-        let statusBadge = '';
-        let actionBtn = '';
-
+        let badge = '', btn = '';
         if(order.status === 'pending') {
-            statusBadge = '<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">معلق</span>';
-            actionBtn = `<button onclick="updateStatus(${order.id}, 'moving')" class="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-orange-600 ml-2">تم التحرك</button>`;
+            badge = '<span class="text-orange-500 font-bold italic">معلق</span>';
+            btn = `<button onclick="updateStatus(${order.id}, 'moving')" class="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs">تحرك</button>`;
         } else if(order.status === 'moving') {
-            statusBadge = '<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">في الطريق</span>';
-            actionBtn = `<button onclick="updateStatus(${order.id}, 'delivered')" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-700 ml-2">تم التسليم</button>`;
+            badge = '<span class="text-blue-500 font-bold italic">في الطريق</span>';
+            btn = `<button onclick="updateStatus(${order.id}, 'delivered')" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs">تم التسليم</button>`;
         } else {
-            statusBadge = '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold font-mono">تم التسليم ✓</span>';
-            actionBtn = `<span class="text-gray-400 text-xs italic ml-2 font-bold">مكتمل</span>`;
+            badge = '<span class="text-green-600 font-bold italic">مكتمل ✓</span>';
+            btn = `<span class="text-slate-300 text-xs uppercase">انتهى</span>`;
         }
-
-        tbody.innerHTML += `
-            <tr class="border-b hover:bg-slate-50 transition ${order.status === 'delivered' ? 'bg-green-50/30' : ''}">
-                <td class="p-4 font-bold text-slate-700">${order.rest}</td>
-                <td class="p-4 text-blue-800 font-bold font-mono">${order.price.toLocaleString()} ج.م</td>
-                <td class="p-4">
-                    <span class="block font-bold text-sm">${order.driverName}</span>
-                    <span class="text-[10px] text-blue-600 font-mono">${order.driverCode}</span>
-                </td>
-                <td class="p-4">${statusBadge}</td>
-                <td class="p-4 text-center">
-                    ${actionBtn}
-                    <button onclick="deleteOrder(${order.id})" class="text-red-400 hover:text-red-600 text-xs mr-2">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        tbody.innerHTML += `<tr class="border-b"><td class="p-4 font-bold uppercase italic">${order.rest}</td><td class="p-4 font-black">${order.price}</td><td class="p-4 text-xs font-bold">${order.driverName}</td><td class="p-4">${badge}</td><td class="p-4 flex gap-2 justify-center">${btn}<button onclick="deleteOrder(${order.id})" class="text-red-300"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 }
 
-// التنقل بين الأقسام
 function showSection(section) {
-    document.getElementById('ordersSection').classList.add('hidden');
-    document.getElementById('driversSection').classList.add('hidden');
-    
-    if(section === 'orders') document.getElementById('ordersSection').classList.remove('hidden');
-    if(section === 'drivers') document.getElementById('driversSection').classList.remove('hidden');
+    document.getElementById('ordersSection').classList.toggle('hidden', section !== 'orders');
+    document.getElementById('driversSection').classList.toggle('hidden', section !== 'drivers');
 }
 
