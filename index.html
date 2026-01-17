@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة توصيل المطاعم</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <aside class="w-64 bg-[#1e293b] text-white flex flex-col hidden md:flex">
+        <div class="p-5 text-xl font-bold border-b border-slate-700 flex items-center gap-2">
+            <i class="fas fa-route text-yellow-500"></i> إدارة التوصيل
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="showSection('orders')" class="w-full flex items-center p-3 bg-blue-600 rounded-lg"><i class="fas fa-shopping-basket ml-3"></i> الطلبات الحالية</button>
+            <button onclick="showSection('drivers')" class="w-full flex items-center p-3 hover:bg-slate-700 rounded-lg transition"><i class="fas fa-user-tie ml-3"></i> سجل المناديب</button>
+            <button onclick="showSection('reports')" class="w-full flex items-center p-3 hover:bg-slate-700 rounded-lg transition"><i class="fas fa-file-invoice-dollar ml-3"></i> التقارير المالية</button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden">
+        
+        <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm">
+            <div class="flex gap-4">
+                <div class="bg-blue-50 border border-blue-100 p-3 rounded-xl text-center min-w-[140px]">
+                    <p class="text-xs text-blue-600 font-bold uppercase">إجمالي اليومية</p>
+                    <p id="dailyIncome" class="text-2xl font-black text-blue-900">0</p>
+                </div>
+                <div class="bg-green-50 border border-green-100 p-3 rounded-xl text-center min-w-[140px]">
+                    <p class="text-xs text-green-600 font-bold uppercase">إجمالي الشهر</p>
+                    <p id="monthlyIncome" class="text-2xl font-black text-green-900">12,450</p>
+                </div>
+            </div>
+            <div class="text-left">
+                <h1 class="text-lg font-bold text-slate-800">نظام توب سبيد (Top Speed)</h1>
+                <p class="text-gray-400 text-xs">مرحباً: المدير العام</p>
+            </div>
+        </header>
+
+        <section id="ordersSection" class="p-6 space-y-6 overflow-y-auto h-full">
+            
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-bold mb-1">المطعم</label>
+                    <input type="text" id="restName" placeholder="اسم المطعم" class="w-full p-2 bg-gray-50 border rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">السعر</label>
+                    <input type="number" id="orderPrice" placeholder="0.00" class="w-full p-2 bg-gray-50 border rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">المندوب</label>
+                    <select id="driverSelect" class="w-full p-2 bg-gray-50 border rounded-lg text-sm">
+                        <option value="D-101|أحمد محمد">D-101 (أحمد محمد)</option>
+                        <option value="D-102|سيد علي">D-102 (سيد علي)</option>
+                        <option value="D-103|محمود حسن">D-103 (محمود حسن)</option>
+                    </select>
+                </div>
+                <button onclick="addNewOrder()" class="bg-blue-600 text-white p-2 rounded-lg font-bold hover:bg-blue-700 transition">
+                    <i class="fas fa-plus ml-2"></i> إضافة أوردر
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <table class="w-full text-right">
+                    <thead class="bg-slate-50 text-slate-600 border-b">
+                        <tr>
+                            <th class="p-4">المطعم</th>
+                            <th class="p-4">السعر</th>
+                            <th class="p-4">كود المندوب</th>
+                            <th class="p-4">اسم المندوب</th>
+                            <th class="p-4">الحالة</th>
+                            <th class="p-4 text-center">إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="driversSection" class="p-6 hidden overflow-y-auto h-full">
+            <h2 class="text-xl font-bold mb-4">سجل أكواد المناديب</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="driversGrid">
+                <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
+                    <div>
+                        <p class="font-bold text-slate-800">أحمد محمد</p>
+                        <p class="text-sm text-blue-600 font-mono">CODE: D-101</p>
+                    </div>
+                    <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">نشط</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        let orders = [];
+        let dailyTotal = 0;
+
+        function addNewOrder() {
+            const rest = document.getElementById('restName').value;
+            const price = parseFloat(document.getElementById('orderPrice').value);
+            const driverData = document.getElementById('driverSelect').value.split('|');
+
+            if(!rest || !price) return alert("برجاء ملء البيانات");
+
+            const newOrder = {
+                id: Date.now(),
+                rest: rest,
+                price: price,
+                driverCode: driverData[0],
+                driverName: driverData[1],
+                status: 'pending' // pending, moving, delivered
+            };
+
+            orders.push(newOrder);
+            renderOrders();
+            
+            // مسح الحقول
+            document.getElementById('restName').value = '';
+            document.getElementById('orderPrice').value = '';
+        }
+
+        function updateStatus(id, nextStatus) {
+            const order = orders.find(o => o.id === id);
+            order.status = nextStatus;
+            
+            if(nextStatus === 'delivered') {
+                dailyTotal += order.price;
+                document.getElementById('dailyIncome').innerText = dailyTotal + " ج.م";
+            }
+            renderOrders();
+        }
+
+        function renderOrders() {
+            const tbody = document.getElementById('ordersTableBody');
+            tbody.innerHTML = '';
+
+            orders.forEach(order => {
+                let statusBadge = '';
+                let actionBtn = '';
+
+                if(order.status === 'pending') {
+                    statusBadge = '<span class="text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs font-bold italic">معلق</span>';
+                    actionBtn = `<button onclick="updateStatus(${order.id}, 'moving')" class="bg-orange-500 text-white px-4 py-1 rounded-lg text-xs hover:bg-orange-600">تم التحرك</button>`;
+                } else if(order.status === 'moving') {
+                    statusBadge = '<span class="text-blue-600 bg-blue-50 px-2 py-1 rounded text-xs font-bold italic">جاري التوصيل</span>';
+                    actionBtn = `<button onclick="updateStatus(${order.id}, 'delivered')" class="bg-blue-600 text-white px-4 py-1 rounded-lg text-xs hover:bg-blue-700">تم التسليم</button>`;
+                } else {
+                    statusBadge = '<span class="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-bold italic">تم التسليم ✓</span>';
+                    actionBtn = `<span class="text-gray-400 text-xs italic">مكتمل</span>`;
+                }
+
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50 transition ${order.status === 'delivered' ? 'opacity-60 bg-gray-50' : ''}">
+                        <td class="p-4 font-bold">${order.rest}</td>
+                        <td class="p-4 text-blue-700 font-bold">${order.price} ج.م</td>
+                        <td class="p-4"><span class="bg-slate-200 px-2 py-1 rounded font-mono text-xs">${order.driverCode}</span></td>
+                        <td class="p-4">${order.driverName}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center">${actionBtn}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function showSection(section) {
+            document.getElementById('ordersSection').classList.add('hidden');
+            document.getElementById('driversSection').classList.add('hidden');
+            
+            if(section === 'orders') document.getElementById('ordersSection').classList.remove('hidden');
+            if(section === 'drivers') document.getElementById('driversSection').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
+
