@@ -1,69 +1,46 @@
-// --- الجزء الخاص بصفحة التحميل (Hacker Loader) ---
-const counterElement = document.getElementById('counter');
-const statusElement = document.getElementById('status');
-const loaderWrapper = document.getElementById('loaderWrapper');
-const mainSystem = document.getElementById('mainSystem');
+// --- 1. نظام التحميل (Loader) ---
+const loaderLogic = {
+    init: () => {
+        const counter = document.getElementById('counter');
+        const status = document.getElementById('status');
+        const wrapper = document.getElementById('loaderWrapper');
+        const main = document.getElementById('mainSystem');
+        let progress = 0;
 
-let count = 0;
-function updateLoader() {
-    if (count < 100) {
-        count += 2; // تسريع التحميل قليلاً
-        if(count > 100) count = 100;
-        counterElement.innerText = count + '%';
-        
-        if (count === 30) statusElement.innerText = "Verifying...";
-        if (count === 70) statusElement.innerText = "Optimizing UI...";
-        setTimeout(updateLoader, 30);
-    } else {
-        // إخفاء الـ Loader وإظهار النظام
-        if(loaderWrapper) loaderWrapper.style.display = 'none';
-        if(mainSystem) mainSystem.style.display = 'flex';
-        document.body.classList.remove('overflow-hidden');
+        const interval = setInterval(() => {
+            progress += Math.floor(Math.random() * 5) + 2;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(interval);
+                if(status) status.innerText = "ACCESS GRANTED";
+                setTimeout(() => {
+                    if(wrapper) wrapper.style.display = 'none';
+                    if(main) main.style.display = 'flex';
+                    document.body.classList.remove('overflow-hidden');
+                }, 500);
+            }
+            if(counter) counter.innerText = progress + '%';
+        }, 30);
     }
-}
-
-// تشغيل اللودر بعد نصف ثانية
-setTimeout(updateLoader, 500);
-
-// --- نظام Top Speed المطور ---
-
-// دالة أمان للتأكد من وجود قاعدة البيانات
-const getDB = () => {
-    return typeof TopSpeedDB !== 'undefined' ? TopSpeedDB : {
-        save: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
-        load: (k) => JSON.parse(localStorage.getItem(k))
-    };
 };
 
-let orders = getDB().load('orders') || [];
-let drivers = getDB().load('drivers') || [];
-let dailyTotal = parseFloat(getDB().load('total')) || 0;
+// --- 2. نظام قاعدة البيانات (Database) ---
+const DB = {
+    save: (key, val) => localStorage.setItem('ts_' + key, JSON.stringify(val)),
+    load: (key) => {
+        const data = localStorage.getItem('ts_' + key);
+        try { return data ? JSON.parse(data) : null; } catch { return null; }
+    }
+};
 
-// تحديث الواجهة عند البداية
-window.addEventListener('load', () => {
-    updateDriverUI();
-    renderOrders();
-    const incomeEl = document.getElementById('dailyIncome');
-    if(incomeEl) incomeEl.innerText = dailyTotal.toLocaleString();
-});
+// --- 3. المتغيرات الأساسية ---
+let orders = DB.load('orders') || [];
+let drivers = DB.load('drivers') || [];
+let dailyTotal = parseFloat(DB.load('total')) || 0;
 
-// 1. إضافة مندوب جديد
-function addNewDriver() {
-    const nameInput = document.getElementById('newDriverName');
-    const codeInput = document.getElementById('newDriverCode');
-    const name = nameInput.value.trim();
-    const code = codeInput.value.trim();
-    
-    if(!name || !code) return alert("أدخل بيانات المندوب!");
-    
-    drivers.push({ name, code });
-    getDB().save('drivers', drivers);
-    updateDriverUI();
-    
-    nameInput.value = '';
-    codeInput.value = '';
-}
+// --- 4. الدالات الأساسية ---
 
+// تحديث واجهة المناديب
 function updateDriverUI() {
     const grid = document.getElementById('driversGrid');
     const select = document.getElementById('driverSelect');
@@ -71,70 +48,64 @@ function updateDriverUI() {
 
     grid.innerHTML = '';
     select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>';
-    
-    drivers.forEach((d, index) => {
-        const opt = document.createElement('option');
-        opt.value = d.code;
-        opt.innerText = `${d.name} (${d.code})`;
-        select.appendChild(opt);
 
+    drivers.forEach((d, index) => {
+        // إضافة للمستطيلات
         grid.innerHTML += `
             <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
-                <div>
-                    <p class="font-bold text-slate-800">${d.name}</p>
-                    <p class="text-xs text-slate-500 italic">Code: ${d.code}</p>
-                </div>
+                <div><p class="font-bold text-slate-800">${d.name}</p><p class="text-xs text-slate-500">كود: ${d.code}</p></div>
                 <button onclick="deleteDriver(${index})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
             </div>`;
+        // إضافة للقائمة المنسدلة
+        const opt = document.createElement('option');
+        opt.value = d.code;
+        opt.innerText = d.name;
+        select.appendChild(opt);
     });
 }
 
 function deleteDriver(index) {
-    if(confirm("هل تريد حذف هذا المندوب؟")) {
+    if(confirm("حذف هذا المندوب؟")) {
         drivers.splice(index, 1);
-        getDB().save('drivers', drivers);
+        DB.save('drivers', drivers);
         updateDriverUI();
     }
 }
 
-// 2. إضافة أوردر جديد
+// إضافة أوردر جديد
 function addNewOrder() {
     const rest = document.getElementById('restName').value.trim();
     const address = document.getElementById('orderAddress').value.trim();
-    const priceInput = document.getElementById('orderPrice');
-    const price = parseFloat(priceInput.value);
-    const driverCode = document.getElementById('driverSelect').value;
+    const price = parseFloat(document.getElementById('orderPrice').value);
+    const dCode = document.getElementById('driverSelect').value;
 
-    if(!rest || !address || isNaN(price) || !driverCode) return alert("برجاء إكمال كافة البيانات!");
+    if(!rest || !address || !price || !dCode) return alert("اكمل البيانات أولاً");
 
-    const driverObj = drivers.find(d => d.code === driverCode);
-    const driverName = driverObj ? driverObj.name : "غير معروف";
+    const driverName = drivers.find(d => d.code === dCode).name;
 
     const newOrder = {
         id: Date.now(),
-        rest,
-        address,
-        price,
-        driverCode,
-        driverName,
+        rest, address, price, 
+        driverCode: dCode,
+        driverName: driverName,
         status: 'معلق'
     };
 
     orders.push(newOrder);
-    getDB().save('orders', orders);
+    DB.save('orders', orders);
     
     dailyTotal += price;
-    getDB().save('total', dailyTotal);
+    DB.save('total', dailyTotal);
     document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString();
 
     renderOrders();
-    
+    // تصفير الخانات
     document.getElementById('restName').value = '';
     document.getElementById('orderAddress').value = '';
-    priceInput.value = '';
+    document.getElementById('orderPrice').value = '';
 }
 
-// 3. عرض الأوردرات
+// عرض الأوردرات
 function renderOrders() {
     const body = document.getElementById('ordersTableBody');
     if(!body) return;
@@ -142,26 +113,33 @@ function renderOrders() {
 
     orders.forEach((o) => {
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.address)}`;
-        const statusClass = o.status === 'تم التسليم' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+        const statusClass = o.status === 'تم التسليم' ? 'status-done' : 'status-pending';
 
         body.innerHTML += `
             <tr class="border-b hover:bg-slate-50 transition">
-                <td class="p-4 font-bold text-slate-800">${o.rest}</td>
+                <td class="p-4 font-bold">${o.rest}</td>
                 <td class="p-4">
                     <div class="flex flex-col">
-                        <span class="text-xs text-slate-600 mb-1">${o.address}</span>
-                        <a href="${mapUrl}" target="_blank" class="text-blue-500 text-[10px] font-bold flex items-center">
-                            <i class="fas fa-map-marker-alt ml-1"></i> فتح الخريطة
-                        </a>
+                        <span class="text-xs text-slate-600">${o.address}</span>
+                        <a href="${mapUrl}" target="_blank" class="text-blue-500 text-[10px] font-bold mt-1"><i class="fas fa-map-marker-alt"></i> الخريطة</a>
                     </div>
                 </td>
-                <td class="p-4 font-mono font-bold text-blue-600">${o.price} EGP</td>
-                <td class="p-4 text-slate-700 font-bold">${o.driverName}</td>
+                <td class="p-4 font-bold text-blue-600">${o.price} EGP</td>
+                <td class="p-4 font-bold">${o.driverName}</td>
                 <td class="p-4 text-center">
-                    <span class="px-3 py-1 rounded-lg text-[10px] font-black ${statusClass}">${o.status}</span>
+                    <button onclick="toggleStatus(${o.id})" class="px-3 py-1 rounded-lg text-[10px] ${statusClass}">${o.status}</button>
                 </td>
             </tr>`;
     });
+}
+
+function toggleStatus(id) {
+    const order = orders.find(o => o.id === id);
+    if(order) {
+        order.status = (order.status === 'معلق') ? 'تم التسليم' : 'معلق';
+        DB.save('orders', orders);
+        renderOrders();
+    }
 }
 
 function showSection(id) {
@@ -169,3 +147,14 @@ function showSection(id) {
     document.getElementById('driversSection').classList.add('hidden');
     document.getElementById(id + 'Section').classList.remove('hidden');
 }
+
+// --- 5. تشغيل النظام عند التحميل ---
+document.addEventListener('DOMContentLoaded', () => {
+    loaderLogic.init();
+    updateDriverUI();
+    renderOrders();
+    if(document.getElementById('dailyIncome')) {
+        document.getElementById('dailyIncome').innerText = dailyTotal.toLocaleString();
+    }
+});
+
