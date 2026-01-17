@@ -1,118 +1,137 @@
-// دالة للتأكد من أن النظام سيفتح مهما حدث خطأ
-function forceOpenSystem() {
-    console.log("Force opening system...");
-    const loader = document.getElementById('loaderWrapper');
-    const system = document.getElementById('mainSystem');
-    if(loader) loader.style.setProperty('display', 'none', 'important');
-    if(system) system.style.setProperty('display', 'flex', 'important');
-    document.body.classList.remove('overflow-hidden');
-    document.body.style.overflow = 'auto';
-}
+// --- 1. تعريف البيانات أولاً (قبل أي شيء) ---
+let drivers = [];
+let orders = [];
+let total = 0;
 
-// 1. نظام التحميل (Loader) مع مؤقت أمان
-let count = 0;
-const counter = document.getElementById('counter');
-
-function updateLoader() {
-    if (count < 100) {
-        count += 2;
-        if(counter) counter.innerText = count + "%";
-        setTimeout(updateLoader, 20);
-    } else {
-        forceOpenSystem();
-    }
-}
-
-// مؤقت أمان: إذا لم يفتح النظام خلال 5 ثوانٍ، افتحه إجبارياً
-setTimeout(() => {
-    if(document.getElementById('loaderWrapper').style.display !== 'none') {
-        console.warn("Safety timer triggered");
-        forceOpenSystem();
-    }
-}, 5000);
-
-// بدء التحميل
-updateLoader();
-
-// 2. إدارة البيانات (بشكل آمن جداً)
+// نظام قاعدة البيانات المصغر
 const TopSpeedDB = {
     save: (key, data) => {
-        try { localStorage.setItem('ts_' + key, JSON.stringify(data)); } 
-        catch(e) { console.error("Save Error", e); }
+        localStorage.setItem('ts_' + key, JSON.stringify(data));
     },
     load: (key) => {
-        try {
-            const data = localStorage.getItem('ts_' + key);
-            return data ? JSON.parse(data) : [];
-        } catch(e) { return []; }
-    },
-    clear: () => {
-        if(confirm("تصفير البيانات؟")) {
-            localStorage.clear();
-            location.reload();
-        }
+        const data = localStorage.getItem('ts_' + key);
+        return data ? JSON.parse(data) : [];
     }
 };
 
-// 3. المنطق الأساسي للنظام
-let orders = TopSpeedDB.load('orders');
-let drivers = TopSpeedDB.load('drivers');
-let total = parseFloat(localStorage.getItem('ts_total')) || 0;
+// --- 2. دالة تشغيل النظام (Initialization) ---
+function initSystem() {
+    drivers = TopSpeedDB.load('drivers');
+    orders = TopSpeedDB.load('orders');
+    total = parseFloat(localStorage.getItem('ts_total')) || 0;
 
-function updateDriverUI() {
-    const grid = document.getElementById('driversGrid');
-    const select = document.getElementById('driverSelect');
-    if(!grid || !select) return;
-
-    grid.innerHTML = '';
-    select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>';
+    updateDriverUI();
+    renderOrders();
     
-    drivers.forEach((d, i) => {
-        grid.innerHTML += `
-            <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
-                <b>${d.name} <span class="text-gray-400 text-xs">(${d.code})</span></b>
-                <button onclick="deleteDriver(${i})" class="text-red-500 p-2"><i class="fas fa-trash"></i></button>
-            </div>`;
-        const opt = document.createElement('option');
-        opt.value = d.code;
-        opt.innerText = d.name;
-        select.appendChild(opt);
-    });
+    const incomeEl = document.getElementById('dailyIncome');
+    if(incomeEl) incomeEl.innerText = total.toLocaleString();
 }
+
+// --- 3. الدوال الأساسية (إضافة مندوب - إضافة أوردر) ---
 
 function addNewDriver() {
     const nameEl = document.getElementById('newDriverName');
     const codeEl = document.getElementById('newDriverCode');
-    if(!nameEl.value || !codeEl.value) return alert("أكمل بيانات المندوب");
-    
-    drivers.push({name: nameEl.value, code: codeEl.value});
+
+    if(!nameEl || !codeEl || !nameEl.value.trim() || !codeEl.value.trim()) {
+        alert("برجاء إدخال اسم المندوب وكوده");
+        return;
+    }
+
+    const newDriver = {
+        name: nameEl.value.trim(),
+        code: codeEl.value.trim()
+    };
+
+    drivers.push(newDriver);
     TopSpeedDB.save('drivers', drivers);
-    updateDriverUI();
-    nameEl.value = ''; codeEl.value = '';
+    
+    updateDriverUI(); // تحديث القائمة فوراً
+    
+    nameEl.value = '';
+    codeEl.value = '';
+    alert("تم إضافة المندوب بنجاح");
 }
 
+function updateDriverUI() {
+    const grid = document.getElementById('driversGrid');
+    const select = document.getElementById('driverSelect');
+    
+    if(grid) grid.innerHTML = '';
+    if(select) select.innerHTML = '<option value="" disabled selected>-- اختر المندوب --</option>';
+    
+    drivers.forEach((d, i) => {
+        if(grid) {
+            grid.innerHTML += `
+                <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
+                    <b>${d.name} <span class="text-gray-400 text-xs">(${d.code})</span></b>
+                    <button onclick="deleteDriver(${i})" class="text-red-500 p-2"><i class="fas fa-trash"></i></button>
+                </div>`;
+        }
+        if(select) {
+            const opt = document.createElement('option');
+            opt.value = d.code;
+            opt.innerText = d.name;
+            select.appendChild(opt);
+        }
+    });
+}
+
+// دالة حذف المندوب
 function deleteDriver(i) {
-    if(confirm("حذف المندوب؟")) {
+    if(confirm("هل تريد حذف هذا المندوب؟")) {
         drivers.splice(i, 1);
         TopSpeedDB.save('drivers', drivers);
         updateDriverUI();
     }
 }
 
+// --- بقية الدوال (اللودر، الأوردرات، إلخ) ---
+
+function forceOpenSystem() {
+    const loader = document.getElementById('loaderWrapper');
+    const system = document.getElementById('mainSystem');
+    if(loader) loader.style.display = 'none';
+    if(system) system.style.display = 'flex';
+    document.body.classList.remove('overflow-hidden');
+}
+
+let count = 0;
+function updateLoader() {
+    const counter = document.getElementById('counter');
+    if (count < 100) {
+        count += 5;
+        if(counter) counter.innerText = count + "%";
+        setTimeout(updateLoader, 30);
+    } else {
+        forceOpenSystem();
+    }
+}
+
+// تشغيل اللودر والبيانات عند فتح الصفحة
+window.addEventListener('DOMContentLoaded', () => {
+    updateLoader();
+    initSystem();
+});
+
+// دالة إضافة الأوردر (تأكد أنها مطابقة لأسماء الـ id عندك)
 function addNewOrder() {
     const rest = document.getElementById('restName');
     const addr = document.getElementById('orderAddress');
     const price = document.getElementById('orderPrice');
-    const dCode = document.getElementById('driverSelect');
+    const dSelect = document.getElementById('driverSelect');
 
-    if(!rest.value || !addr.value || !price.value || !dCode.value) return alert("اكمل بيانات الأوردر");
+    if(!rest.value || !addr.value || !price.value || !dSelect.value) {
+        alert("أكمل بيانات الأوردر");
+        return;
+    }
 
     const order = {
         id: Date.now(),
         rest: rest.value,
         addr: addr.value,
         price: parseFloat(price.value),
-        dCode: dCode.value,
+        dCode: dSelect.value,
         status: 'معلق'
     };
 
@@ -131,22 +150,17 @@ function renderOrders() {
     const body = document.getElementById('ordersTableBody');
     if(!body) return;
     body.innerHTML = '';
-    
     orders.forEach(o => {
-        const driver = drivers.find(d => d.code == o.dCode);
-        const map = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.addr)}`;
-        
+        const d = drivers.find(drv => drv.code == o.dCode);
         body.innerHTML += `
             <tr class="border-b text-sm">
-                <td class="p-4 font-bold text-slate-800">${o.rest}</td>
-                <td class="p-4">
-                    <a href="${map}" target="_blank" class="text-blue-600 hover:underline">
-                        <i class="fas fa-map-marker-alt ml-1"></i> ${o.addr}
-                    </a>
+                <td class="p-4 font-bold">${o.rest}</td>
+                <td class="p-4">${o.addr}</td>
+                <td class="p-4">${o.price} EGP</td>
+                <td class="p-4">${d ? d.name : '---'}</td>
+                <td class="p-4 text-center">
+                    <span class="px-2 py-1 rounded-full text-[10px] bg-yellow-100 text-yellow-700">${o.status}</span>
                 </td>
-                <td class="p-4 font-bold text-blue-700">${o.price} EGP</td>
-                <td class="p-4">${driver ? driver.name : '---'}</td>
-                <td class="p-4"><span class="px-2 py-1 rounded-full text-[10px] font-black ${o.status === 'تم' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${o.status}</span></td>
             </tr>`;
     });
 }
@@ -156,11 +170,3 @@ function showSection(id) {
     document.getElementById('driversSection').classList.add('hidden');
     document.getElementById(id + 'Section').classList.remove('hidden');
 }
-
-// تشغيل عند التحميل
-window.addEventListener('load', () => {
-    updateDriverUI();
-    renderOrders();
-    const incomeEl = document.getElementById('dailyIncome');
-    if(incomeEl) incomeEl.innerText = total.toLocaleString();
-});
