@@ -1,7 +1,11 @@
-// 1. إعداد قاعدة البيانات والبيانات الأولية
+// 1. تعريف قاعدة البيانات محلياً داخل الملف لضمان الاستقرار
 const TopSpeedDB = {
     save: (key, data) => localStorage.setItem('ts_' + key, JSON.stringify(data)),
-    load: (key) => JSON.parse(localStorage.getItem('ts_' + key)) || [],
+    load: (key) => {
+        try {
+            return JSON.parse(localStorage.getItem('ts_' + key)) || [];
+        } catch(e) { return []; }
+    },
     clear: () => {
         if(confirm("تصفير جميع البيانات؟")) {
             localStorage.clear();
@@ -10,142 +14,142 @@ const TopSpeedDB = {
     }
 };
 
+// 2. تحميل البيانات
 let drivers = TopSpeedDB.load('drivers');
 let orders = TopSpeedDB.load('orders');
 
-// 2. نظام اللودر (Loader)
+// 3. التحكم في شاشة التحميل (Loader)
 let count = 0;
-function updateLoader() {
+const updateLoader = () => {
     const counter = document.getElementById('counter');
     const loader = document.getElementById('loaderWrapper');
     const main = document.getElementById('mainSystem');
 
     if (count < 100) {
-        count += 5;
+        count += 10;
         if(counter) counter.innerText = count + "%";
-        setTimeout(updateLoader, 20);
+        setTimeout(updateLoader, 30);
     } else {
         if(loader) loader.style.display = 'none';
-        if(main) main.style.display = 'flex';
+        if(main) {
+            main.style.display = 'flex';
+            main.style.opacity = '1';
+        }
         document.body.classList.remove('overflow-hidden');
-        renderAll(); // تشغيل العرض فور الدخول
+        renderAll(); // عرض البيانات فوراً
     }
-}
+};
 
-// 3. إدارة المناديب
-function addNewDriver() {
-    const nameEl = document.getElementById('newDriverName');
-    const codeEl = document.getElementById('newDriverCode');
+// 4. دالة عرض البيانات (التي كانت تسبب المشكلة)
+function renderAll() {
+    // أ- تحديث جدول الطلبات
+    const tableBody = document.getElementById('ordersTableBody');
+    if (tableBody) {
+        if (orders.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold">لا توجد طلبات اليوم</td></tr>';
+        } else {
+            tableBody.innerHTML = orders.map((o, index) => {
+                const isDone = o.status === 'تم التسليم';
+                return `
+                    <tr class="border-b bg-white hover:bg-slate-50 transition">
+                        <td class="p-4 font-bold text-slate-800">${o.rest || 'بدون اسم'}</td>
+                        <td class="p-4 text-xs">
+                            <a href="https://www.google.com/maps/search/${encodeURIComponent(o.addr)}" target="_blank" class="text-blue-500 hover:underline">
+                                <i class="fas fa-map-marker-alt ml-1"></i> ${o.addr || 'غير محدد'}
+                            </a>
+                        </td>
+                        <td class="p-4 font-black text-slate-900">${o.price} EGP</td>
+                        <td class="p-4 text-sm font-bold text-slate-600">${o.driverName || 'غير محدد'}</td>
+                        <td class="p-4 text-center">
+                            ${isDone 
+                                ? `<span class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black border border-green-200">تم التسليم ✅</span>`
+                                : `<button onclick="completeOrder(${o.id})" class="bg-blue-600 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm active:scale-95">تأكيد التسليم</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).reverse().join('');
+        }
+    }
 
-    if(!nameEl.value || !codeEl.value) return alert("أكمل بيانات المندوب");
+    // ب- تحديث قائمة المناديب (Dropdown)
+    const select = document.getElementById('driverSelect');
+    if (select) {
+        select.innerHTML = '<option value="" disabled selected>اختيار المندوب</option>' + 
+            drivers.map(d => `<option value="${d.code}">${d.name}</option>`).join('');
+    }
 
-    drivers.push({ name: nameEl.value, code: codeEl.value });
-    TopSpeedDB.save('drivers', drivers);
+    // ج- تحديث شبكة المناديب (Drivers Grid)
+    const grid = document.getElementById('driversGrid');
+    if (grid) {
+        grid.innerHTML = drivers.length ? drivers.map(d => `
+            <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
+                <span class="font-bold text-slate-700">${d.name} <small class="text-slate-400 block text-[10px]">كود: ${d.code}</small></span>
+                <i class="fas fa-user-check text-blue-500"></i>
+            </div>
+        `).join('') : '<p class="text-center text-slate-400 col-span-2">لم يتم إضافة مناديب بعد</p>';
+    }
+
+    // د- تحديث الرصيد (يحسب فقط الطلبات المكتملة)
+    const total = orders
+        .filter(o => o.status === 'تم التسليم')
+        .reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
     
-    nameEl.value = ''; codeEl.value = '';
-    renderAll();
-    alert("تم تفعيل المندوب");
+    const incomeEl = document.getElementById('dailyIncome');
+    if (incomeEl) incomeEl.innerText = total.toLocaleString();
 }
 
-// 4. إدارة الطلبات
+// 5. إدارة المناديب والطلبات
+function addNewDriver() {
+    const name = document.getElementById('newDriverName').value;
+    const code = document.getElementById('newDriverCode').value;
+    if(!name || !code) return alert("أدخل بيانات المندوب كاملة");
+    drivers.push({ name, code });
+    TopSpeedDB.save('drivers', drivers);
+    renderAll();
+    document.getElementById('newDriverName').value = '';
+    document.getElementById('newDriverCode').value = '';
+}
+
 function addNewOrder() {
-    const rest = document.getElementById('restName');
-    const addr = document.getElementById('orderAddress');
-    const price = document.getElementById('orderPrice');
+    const rest = document.getElementById('restName').value;
+    const addr = document.getElementById('orderAddress').value;
+    const price = document.getElementById('orderPrice').value;
     const dSelect = document.getElementById('driverSelect');
 
-    if(!rest.value || !addr.value || !price.value || !dSelect.value) {
-        return alert("أكمل بيانات الأوردر واختار المندوب");
-    }
+    if(!rest || !addr || !price || !dSelect.value) return alert("أكمل بيانات الطلب");
 
     const newOrder = {
         id: Date.now(),
-        rest: rest.value,
-        addr: addr.value,
-        price: parseFloat(price.value),
+        rest,
+        addr,
+        price: parseFloat(price),
         driverName: dSelect.options[dSelect.selectedIndex].text,
         status: 'معلق'
     };
 
     orders.push(newOrder);
     TopSpeedDB.save('orders', orders);
-    
-    rest.value = ''; addr.value = ''; price.value = '';
     renderAll();
-}
-
-// 5. زر تأكيد التسليم وزر الحذف
-function completeOrder(id) {
-    const idx = orders.findIndex(o => o.id === id);
-    if(idx !== -1) {
-        orders[idx].status = 'تم التسليم';
-        TopSpeedDB.save('orders', orders);
-        renderAll();
-    }
-}
-
-function deleteOrder(id) {
-    if(confirm("حذف الأوردر نهائياً؟")) {
-        orders = orders.filter(o => o.id !== id);
-        TopSpeedDB.save('orders', orders);
-        renderAll();
-    }
-}
-
-// 6. العرض الشامل (الجدول والرصيد والمناديب)
-function renderAll() {
-    // تحديث الجدول
-    const tableBody = document.getElementById('ordersTableBody');
-    if(tableBody) {
-        tableBody.innerHTML = orders.map(o => `
-            <tr class="border-b bg-white">
-                <td class="p-4 font-bold text-slate-800">${o.rest}</td>
-                <td class="p-4 text-blue-600 underline text-xs">${o.addr}</td>
-                <td class="p-4 font-black">${o.price} EGP</td>
-                <td class="p-4 text-sm">${o.driverName}</td>
-                <td class="p-4 text-center flex items-center justify-center gap-2">
-                    ${o.status === 'تم التسليم' 
-                        ? `<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black">تم التسليم ✅</span>`
-                        : `<button onclick="completeOrder(${o.id})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold hover:bg-green-600 transition">تأكيد التسليم</button>`
-                    }
-                    <button onclick="deleteOrder(${o.id})" class="text-red-300 hover:text-red-600"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `).reverse().join(''); // عكس الترتيب عشان الجديد يظهر فوق
-    }
-
-    // تحديث قائمة المناديب في السليكت (Select)
-    const select = document.getElementById('driverSelect');
-    if(select) {
-        select.innerHTML = '<option value="" disabled selected>اختيار المندوب</option>' + 
-            drivers.map(d => `<option value="${d.code}">${d.name}</option>`).join('');
-    }
-
-    // تحديث شبكة المناديب (Grid)
-    const grid = document.getElementById('driversGrid');
-    if(grid) {
-        grid.innerHTML = drivers.map(d => `
-            <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
-                <b>${d.name} <span class="text-gray-400 text-[10px]">(${d.code})</span></b>
-                <i class="fas fa-check-circle text-green-500"></i>
-            </div>
-        `).join('');
-    }
-
-    // تحديث الرصيد (يحسب فقط اللي "تم التسليم")
-    const total = orders
-        .filter(o => o.status === 'تم التسليم')
-        .reduce((sum, o) => sum + o.price, 0);
     
-    const incomeEl = document.getElementById('dailyIncome');
-    if(incomeEl) incomeEl.innerText = total.toLocaleString();
+    document.getElementById('restName').value = '';
+    document.getElementById('orderAddress').value = '';
+    document.getElementById('orderPrice').value = '';
 }
 
-// 7. التنقل بين الأقسام
-function showSection(id) {
-    document.getElementById('ordersSection').classList.toggle('hidden', id !== 'orders');
-    document.getElementById('driversSection').classList.toggle('hidden', id !== 'drivers');
+function completeOrder(orderId) {
+    const index = orders.findIndex(o => o.id === orderId);
+    if (index !== -1) {
+        orders[index].status = 'تم التسليم';
+        TopSpeedDB.save('orders', orders);
+        renderAll();
+    }
 }
 
-// تشغيل النظام
-updateLoader();
+function showSection(section) {
+    document.getElementById('ordersSection').classList.toggle('hidden', section !== 'orders');
+    document.getElementById('driversSection').classList.toggle('hidden', section !== 'drivers');
+}
+
+// 6. بدء التشغيل
+document.addEventListener('DOMContentLoaded', updateLoader);
